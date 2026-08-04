@@ -599,44 +599,6 @@ export default function Home() {
   function statusEditor(g: Guest) {
     return editKey(g.id, "status") ? <select className="status-select" autoFocus value={g.status} onChange={e => { updateGuest(g.id, "status", e.target.value); setEditing(null); }} onBlur={() => setEditing(null)}>{statuses.map(status => <option key={status}>{status}</option>)}</select> : <button className={`status-chip status-${g.status.toLowerCase().replace("é","e").replace(" ","-")}`} onClick={() => setEditing({ id:g.id, field:"status" })}>{g.status}</button>;
   }
-  function parseCsvLine(line: string, separator: string) {
-    const values: string[] = []; let value = ""; let quoted = false;
-    for (let i = 0; i < line.length; i++) {
-      const char = line[i];
-      if (char === '"' && quoted && line[i + 1] === '"') { value += '"'; i++; }
-      else if (char === '"') quoted = !quoted;
-      else if (char === separator && !quoted) { values.push(value.trim()); value = ""; }
-      else value += char;
-    }
-    values.push(value.trim()); return values;
-  }
-  async function importCsv(file: File, announce = true) {
-    try {
-      const imported = guestsFromCsv(await file.text());
-      setGuests(imported); setSelected([]); setGenerated(false); if (announce) notify(`${imported.length} invités importés depuis ${file.name}`);
-    } catch (error) { notify(error instanceof Error ? error.message : "Impossible de lire ce CSV"); }
-  }
-  function guestsFromCsv(rawText: string) {
-      const text = rawText.replace(/^\uFEFF/, "");
-      const lines = text.split(/\r?\n/).filter(Boolean);
-      if (lines.length < 2) throw new Error("Le fichier ne contient aucun invité");
-      const separator = (lines[0].match(/;/g)?.length ?? 0) >= (lines[0].match(/,/g)?.length ?? 0) ? ";" : ",";
-      const headers = parseCsvLine(lines[0], separator).map(h => h.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim());
-      const column = (...names: string[]) => headers.findIndex(h => names.includes(h));
-      const indexes = { name: column("nom", "invite", "nom complet"), status: column("statut", "status"), age: column("tranche d'age", "age"), group: column("affiliation", "groupe", "famille"), gender: column("genre"), language: column("langues", "langue"), tags: column("caracteristiques", "tags", "preferences"), table: column("table", "table imposee"), pairId: column("lien id"), pairType: column("type de lien"), partner: column("partenaire"), coupleId: column("couple id"), couplePartner: column("conjoint") };
-      if (indexes.name < 0) throw new Error("La colonne « Nom » est obligatoire");
-      return lines.slice(1).map((line, i) => {
-        const row = parseCsvLine(line, separator); const get = (index: number, fallback: string) => index >= 0 && row[index] ? row[index] : fallback;
-        const tableValue = indexes.table >= 0 ? Number(row[indexes.table]) : undefined;
-        return { id: Date.now() + i, name: get(indexes.name, "Invité"), status: get(indexes.status, "Confirmé"), age: get(indexes.age, "À définir"), group: get(indexes.group, "À définir"), gender: get(indexes.gender, "Non précisé"), language: get(indexes.language, "Français"), tags: get(indexes.tags, "").split(/[,|]/).map(t => t.trim()).filter(Boolean), table: tableValue !== undefined && Number.isFinite(tableValue) && tableValue > 0 ? tableValue : undefined, pairId: get(indexes.pairId, "") || undefined, pairType: get(indexes.pairType, "") || undefined, partner: get(indexes.partner, "") || undefined, coupleId:get(indexes.coupleId, "") || undefined, couplePartner:get(indexes.couplePartner, "") || undefined } satisfies Guest;
-      });
-  }
-  function exportCsv() {
-    const quote = (value: string | number | undefined) => `"${String(value ?? "").replaceAll('"', '""')}"`;
-    const rows = [["Nom", "Statut", "Tranche d'âge", "Affiliation", "Genre", "Langues", "Caractéristiques", "Table", "Lien ID", "Type de lien", "Partenaire", "Couple ID", "Conjoint"].map(quote).join(";"), ...guests.map(g => [g.name, g.status, g.age, g.group, g.gender, g.language, g.tags.join(", "), g.table, g.pairId, g.pairType, g.partner, g.coupleId, g.couplePartner].map(quote).join(";"))];
-    const blob = new Blob(["\uFEFF" + rows.join("\r\n")], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = "invites-place-parfaite.csv"; link.click(); URL.revokeObjectURL(url); notify("CSV exporté avec toutes vos modifications");
-  }
   async function authenticate(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const response = await fetch("/api/auth", {
@@ -687,7 +649,7 @@ export default function Home() {
       </header>
 
       {tab === "Invités" && <section className="page">
-        <div className="heading"><div><p className="eyebrow">VOTRE MARIAGE · 14 JUIN 2027</p><h1>La liste des invités</h1><p>Organisez les affinités aujourd'hui, laissez l'algorithme trouver l'équilibre demain.</p></div><div className="actions"><label className="outline file">↑ Importer CSV<input type="file" accept=".csv,text/csv" onChange={e => { const file=e.target.files?.[0]; if(file) importCsv(file); e.target.value=""; }} /></label><button className="outline" onClick={exportCsv}>↓ Exporter CSV</button><button className="primary" onClick={() => openGuestEditor()}>＋ Ajouter un invité</button></div></div>
+        <div className="heading"><div><p className="eyebrow">VOTRE MARIAGE · 14 JUIN 2027</p><h1>La liste des invités</h1><p>Organisez les affinités aujourd'hui, laissez l'algorithme trouver l'équilibre demain.</p></div><div className="actions"><button className="primary" onClick={() => openGuestEditor()}>＋ Ajouter un invité</button></div></div>
         <div className="stats"><article><span>INVITÉS ACTIFS</span><b>{guests.filter(g=>g.status!=="Désisté"&&g.status!=="Doublon").length}</b><small>{guests.length} fiches au total</small></article><article><span>GROUPES</span><b>{new Set(guests.map(g=>g.group)).size}</b><small>affiliations identifiées</small></article><article><span>DÉSISTEMENTS</span><b>{guests.filter(g=>g.status==="Désisté").length}</b><small>exclus de la génération</small></article><article className="capacity"><span>CAPACITÉ PAR TABLE</span><div><button onClick={() => setCapacity(Math.max(2,capacity-1))}>−</button><b>{capacity}</b><button onClick={() => setCapacity(capacity+1)}>＋</button></div><small>Le plan sera recalculé à la demande</small></article></div>
         <div className="toolbar"><div className="search">⌕ <input aria-label="Rechercher" placeholder="Rechercher un invité, une famille…" value={query} onChange={e=>setQuery(e.target.value)} /></div><div className="filters"><span>☷ Filtres {activeFilterCount > 0 && <b>{activeFilterCount}</b>}</span><select aria-label="Filtrer par affiliation" value={groupFilter} onChange={e=>setGroupFilter(e.target.value)}><option value="">Toutes les affiliations</option>{groups.map(group=><option key={group}>{group}</option>)}</select><select aria-label="Filtrer par statut" value={statusFilter} onChange={e=>setStatusFilter(e.target.value)}><option value="">Tous les statuts</option>{statuses.map(status=><option key={status}>{status}</option>)}</select><select aria-label="Filtrer par tranche d’âge" value={ageFilter} onChange={e=>setAgeFilter(e.target.value)}><option value="">Tous les âges</option>{ages.map(age=><option key={age}>{age}</option>)}</select>{activeFilterCount > 0 && <button onClick={()=>{setGroupFilter("");setStatusFilter("");setAgeFilter("")}}>Effacer</button>}</div><i></i><span>{filtered.length} affichés · {selected.length} sélectionnés</span>{selected.length > 0 && <select className="bulk-select" defaultValue="" onChange={e=>{bulkGroup(e.target.value);e.target.value=""}}><option value="" disabled>Modifier l’affiliation…</option>{groups.map(group=><option key={group}>{group}</option>)}</select>}{selected.length > 0 && <select className="bulk-select" defaultValue="" onChange={e=>{const status=e.target.value;setGuests(items=>items.map(item=>selected.includes(item.id)?((status==="Désisté"||status==="Doublon")?{...item,status,table:undefined,lockedTable:undefined,overrideTable:undefined}:{...item,status}):item));notify(`${selected.length} statuts modifiés`);e.target.value=""}}><option value="" disabled>Modifier le statut…</option>{statuses.map(status=><option key={status}>{status}</option>)}</select>}<button onClick={()=>{setGuests(items=>items.map(item=>selected.includes(item.id)?{...item,status:"Désisté",table:undefined,lockedTable:undefined,overrideTable:undefined}:item));setSelected([]);notify("Invités marqués comme désistés")}}>Marquer désisté</button></div>
         <div className="edit-hint">✎ Cliquez sur n'importe quelle information pour la modifier — chaque changement est sauvegardé automatiquement.</div>
