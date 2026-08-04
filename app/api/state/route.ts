@@ -6,7 +6,6 @@ export const runtime = "nodejs";
 const MAX_STATE_BYTES = 2_000_000;
 
 export async function GET() {
-  if (!(await requestIsAuthenticated())) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
   try {
     const result = await sql<{ data: unknown }>("select data from app_state where id = $1", ["main"]);
     const state = result.rows?.[0]?.data;
