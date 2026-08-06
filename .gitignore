@@ -36,7 +36,12 @@ yarn-error.log*
 
 # typescript
 next-env.d.ts
+*.tsbuildinfo
 /dist/
 /.wrangler/
 /outputs/
 /work/
+
+# generated previews and exports
+/output/
+/tmp/
