@@ -12,29 +12,30 @@ export type TablePdfCard = {
   guests: Array<{ name: string; age: string }>;
 };
 
-function ascii(value: string) {
-  return value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replaceAll("œ", "oe")
-    .replaceAll("Œ", "OE")
-    .replaceAll("’", "'")
-    .replaceAll("–", "-")
-    .replaceAll("—", "-")
-    .replace(/[^\x20-\x7E]/g, "?");
-}
+const winAnsiSpecial = new Map<number, number>([
+  [0x20ac, 0x80], [0x201a, 0x82], [0x0192, 0x83], [0x201e, 0x84], [0x2026, 0x85],
+  [0x2020, 0x86], [0x2021, 0x87], [0x02c6, 0x88], [0x2030, 0x89], [0x0160, 0x8a],
+  [0x2039, 0x8b], [0x0152, 0x8c], [0x017d, 0x8e], [0x2018, 0x91], [0x2019, 0x92],
+  [0x201c, 0x93], [0x201d, 0x94], [0x2022, 0x95], [0x2013, 0x96], [0x2014, 0x97],
+  [0x02dc, 0x98], [0x2122, 0x99], [0x0161, 0x9a], [0x203a, 0x9b], [0x0153, 0x9c],
+  [0x017e, 0x9e], [0x0178, 0x9f],
+]);
 
 function pdfText(value: string) {
-  const degreeToken = "__PDF_DEGREE__";
-  return ascii(value.replaceAll("°", degreeToken))
-    .replaceAll("\\", "\\\\")
-    .replaceAll("(", "\\(")
-    .replaceAll(")", "\\)")
-    .replaceAll(degreeToken, "\\260");
+  return Array.from(value).map(character => {
+    const codePoint = character.codePointAt(0)!;
+    const byte = codePoint <= 0x7e || (codePoint >= 0xa0 && codePoint <= 0xff)
+      ? codePoint
+      : winAnsiSpecial.get(codePoint);
+    if (byte === undefined) return "?";
+    if (byte === 0x5c || byte === 0x28 || byte === 0x29) return `\\${String.fromCharCode(byte)}`;
+    if (byte >= 0x20 && byte <= 0x7e) return String.fromCharCode(byte);
+    return `\\${byte.toString(8).padStart(3, "0")}`;
+  }).join("");
 }
 
 function shorten(value: string, max: number) {
-  const clean = ascii(value);
+  const clean = value.replace(/\s+/g, " ").trim();
   return clean.length <= max ? clean : clean.slice(0, Math.max(0, max - 3)).trimEnd() + "...";
 }
 
@@ -45,10 +46,10 @@ function text(font: "F1" | "F2", size: number, x: number, y: number, value: stri
 function pageContent(rows: SeatingRow[], page: number, totalPages: number) {
   let content = "0.12 0.25 0.21 rg\n";
   content += text("F2", 19, 46, 790, "Place Parfaite");
-  content += text("F1", 10, 46, 770, "Liste alphabetique du plan de table");
-  content += text("F1", 8, 46, 754, "Le numero indique la table, jamais son emplacement dans la salle.");
+  content += text("F1", 10, 46, 770, "Liste alphabétique du plan de table");
+  content += text("F1", 8, 46, 754, "Le numéro indique la table, jamais son emplacement dans la salle.");
   content += "0.93 0.96 0.94 rg 42 716 511 25 re f\n0.12 0.25 0.21 rg\n";
-  content += text("F2", 9, 50, 725, "Invite");
+  content += text("F2", 9, 50, 725, "Invité");
   content += text("F2", 9, 350, 725, "N° de table");
   content += text("F2", 9, 432, 725, "Nom de table");
   let y = 704;
@@ -103,14 +104,14 @@ function circle(cx: number, cy: number, radius: number) {
 }
 
 function initials(name: string) {
-  return ascii(name).replace(/^(M|Mme|Mlle)\.?\s+/i, "").split(/\s+/).filter(Boolean).slice(0, 3).map(part => part[0]?.toUpperCase()).join("");
+  return name.replace(/^(M|Mme|Mlle)\.?\s+/i, "").split(/\s+/).filter(Boolean).slice(0, 3).map(part => part[0]?.toUpperCase()).join("");
 }
 
 function tableCard(card: TablePdfCard, x: number, y: number, width: number, height: number) {
   const green = "0.12 0.25 0.21";
   let content = `0.82 0.86 0.83 RG 0.8 w ${x} ${y} ${width} ${height} re S\n`;
   content += `0.93 0.96 0.94 rg ${x} ${y + height - 76} ${width} 76 re f\n${green} rg\n`;
-  content += text("F2", 8, x + 18, y + height - 24, card.tableNumber === 0 ? "TABLE 0 - TABLE DES MARIES" : `TABLE ${card.tableNumber}`);
+  content += text("F2", 8, x + 18, y + height - 24, card.tableNumber === 0 ? "TABLE 0 - TABLE DES MARIÉS" : `TABLE ${card.tableNumber}`);
   content += text("F2", 17, x + 18, y + height - 48, shorten(card.tableName, 32));
   content += text("F1", 8, x + 18, y + height - 65, `<< ${shorten(card.motto, 55)} >>`);
   content += `0.82 0.88 0.84 RG ${circle(x + width - 34, y + height - 36, 21)} S\n${green} rg\n`;
@@ -125,9 +126,9 @@ function tableCard(card: TablePdfCard, x: number, y: number, width: number, heig
     content += `0.88 0.93 0.9 rg ${circle(seatX + 17, seatY - 4, 12)} f\n${green} rg\n`;
     content += text("F2", 7, seatX + 9, seatY - 7, shorten(initials(guest.name), 4));
     content += text("F2", 8, seatX + 34, seatY + 1, shorten(guest.name, 27));
-    content += text("F1", 7, seatX + 34, seatY - 12, shorten(guest.age || "Age non renseigne", 27));
+    content += text("F1", 7, seatX + 34, seatY - 12, shorten(guest.age || "Âge non renseigné", 27));
   });
-  if (card.guests.length > 10) content += text("F1", 7, x + 18, y + 10, `+ ${card.guests.length - 10} autre(s) invite(s)`);
+  if (card.guests.length > 10) content += text("F1", 7, x + 18, y + 10, `+ ${card.guests.length - 10} autre(s) invité(s)`);
   return content;
 }
 
