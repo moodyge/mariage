@@ -1,9 +1,10 @@
 import { loadWeddingState } from "@/lib/wedding-state";
 import { createTablesPdf } from "@/lib/seating-pdf";
+import { orderCouplesTogether } from "@/lib/guest-order";
 
 export const runtime = "nodejs";
 
-type Guest = { name: string; status: string; gender?: string; age?: string; table?: number };
+type Guest = { id?: number; name: string; status: string; gender?: string; age?: string; table?: number; coupleId?: string };
 type Snapshot = { guests?: Guest[]; capacity?: number; tableCapacities?: Record<number, number>; tables?: Array<{ name: string; motto: string; capacity?: number }> };
 
 const tables = [
@@ -27,6 +28,7 @@ function displayName(guest: Guest) {
   const female = /^\s*(madame|mademoiselle|mrs|mlle|mme)\.?\s+/i.test(guest.name);
   const male = /^\s*(monsieur|mr|m)\.?\s+/i.test(guest.name);
   const base = guest.name.replace(/^\s*(monsieur|madame|mademoiselle|mr|mrs|mlle|mme|m)\.?\s+/i, "").replace(/\s+/g, " ").trim();
+  if (/^(col\.?|colonel)\s+/i.test(base)) return base;
   if (guest.gender === "Homme") return `M. ${base}`;
   if (guest.gender === "Femme") return `Mme. ${base}`;
   return male ? `M. ${base}` : female ? `Mme. ${base}` : base;
@@ -36,10 +38,11 @@ export async function GET() {
   try {
     const snapshot = (await loadWeddingState() || {}) as Snapshot;
     const guests = snapshot.guests || [];
+    const activeGuests = guests.filter(guest => guest.status !== "Désisté" && guest.status !== "Doublon");
     const currentTables = snapshot.tables?.length === tables.length ? snapshot.tables : tables.map(table => ({ name:table[0], motto:table[1], capacity:table[2] }));
     const cards = currentTables.map((table, index) => {
       const internalNumber = index + 1;
-      const tableGuests = guests.filter(guest => guest.table === internalNumber && guest.status !== "Désisté" && guest.status !== "Doublon").sort((a, b) => a.name.localeCompare(b.name, "fr", { sensitivity: "base" }));
+      const tableGuests = orderCouplesTogether(activeGuests.filter(guest => guest.table === internalNumber), { couplesFirst: true });
       return {
         tableNumber: index,
         tableName: table.name, motto: table.motto,

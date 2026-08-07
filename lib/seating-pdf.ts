@@ -2,6 +2,7 @@ type SeatingRow = {
   guestName: string;
   tableNumber: number;
   tableName: string;
+  coupleId?: string;
 };
 
 export type TablePdfCard = {
@@ -68,9 +69,13 @@ function pageContent(rows: SeatingRow[], page: number, totalPages: number) {
 
 export function createSeatingPdf(rows: SeatingRow[]) {
   const perPage = 29;
-  const pages = Array.from({ length: Math.max(1, Math.ceil(rows.length / perPage)) }, (_, index) =>
-    rows.slice(index * perPage, (index + 1) * perPage),
-  );
+  const pages: SeatingRow[][] = [[]];
+  for (let index = 0; index < rows.length; index++) {
+    const row = rows[index];
+    const nextIsPartner = Boolean(row.coupleId && rows[index + 1]?.coupleId === row.coupleId);
+    if (pages.at(-1)!.length >= perPage || (nextIsPartner && pages.at(-1)!.length === perPage - 1)) pages.push([]);
+    pages.at(-1)!.push(row);
+  }
   const objects: string[] = [];
   const pageRefs = pages.map((_, index) => 5 + index * 2);
   objects[1] = "<< /Type /Catalog /Pages 2 0 R >>";

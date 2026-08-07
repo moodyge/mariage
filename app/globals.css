@@ -123,6 +123,8 @@
 .legend-imposed { color:#315e50; }
 .legend-locked { color:#a8732f; }
 .legend-auto { color:#718b98; }
+.seats button.couple-linked { position:relative; z-index:2; overflow:visible; }
+.seats button.couple-linked::before { content:"∞"; position:absolute; z-index:3; left:-5px; top:50%; display:grid; width:20px; height:20px; place-items:center; transform:translate(-50%,-50%); border:2px solid #fff; border-radius:50%; background:#c99b56; color:#fff; font:700 13px/1 Georgia,serif; box-shadow:0 2px 6px #2638322b; pointer-events:none; }
 .seats button.seat-imposed { border-left:4px solid #315e50; background:#f3f7f4; }
 .seats button.seat-locked { border-left:4px solid #c99b56; background:#fffaf1; }
 .seats button.seat-auto { border-left:4px solid #90a8b5; background:#f7fafb; }
@@ -658,3 +660,5 @@ body.mobile-menu-open { overflow:hidden; }
   }
   body[data-print-room="true"] .room-feature { font-size:7pt!important; }
 }
+
+/* Relation visuelle : placée après les styles de cartes pour conserver la couleur. */
